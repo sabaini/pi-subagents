@@ -6,6 +6,7 @@ import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadSkills, type Skill } from "@mariozechner/pi-coding-agent";
 
 export type SkillSource =
@@ -47,6 +48,7 @@ const LOAD_SKILLS_CACHE_TTL_MS = 5000;
 
 const CONFIG_DIR = ".pi";
 const AGENT_DIR = path.join(os.homedir(), ".pi", "agent");
+const EXTENSION_ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 const SOURCE_PRIORITY: Record<SkillSource, number> = {
 	project: 700,
@@ -193,7 +195,8 @@ function buildSkillPaths(cwd: string): string[] {
 	];
 	const packagePaths = collectPackageSkillPaths(cwd);
 	const settingsPaths = collectSettingsSkillPaths(cwd);
-	return [...new Set([...defaultSkillPaths, ...packagePaths, ...settingsPaths])];
+	const extensionPaths = getPackageSkillPaths(EXTENSION_ROOT);
+	return [...new Set([...defaultSkillPaths, ...packagePaths, ...settingsPaths, ...extensionPaths])];
 }
 
 function inferSkillSource(sourceInfo: { source: string; scope: string }, filePath: string, cwd: string): SkillSource {
@@ -214,6 +217,8 @@ function inferSkillSource(sourceInfo: { source: string; scope: string }, filePat
 
 	const globalRoot = getGlobalNpmRoot();
 	if (globalRoot && isWithinPath(filePath, globalRoot)) return "user-package";
+
+	if (isWithinPath(filePath, EXTENSION_ROOT)) return "extension";
 
 	return "unknown";
 }

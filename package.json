@@ -30,6 +30,7 @@
     "!*.test.ts",
     "*.mjs",
     "agents/",
+    "skills/",
     "README.md",
     "CHANGELOG.md"
   ],
@@ -44,6 +45,9 @@
     "extensions": [
       "./index.ts",
       "./notify.ts"
+    ],
+    "skills": [
+      "./skills"
     ]
   },
   "peerDependencies": {

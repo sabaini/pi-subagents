@@ -31,9 +31,12 @@ export const TEMPLATE_ITEMS: TemplateItem[] = [
 		type: "agent",
 		name: "Code Reviewer",
 		config: {
-			description: "Reviews code for bugs, style, and correctness",
-			systemPrompt: "You are a code review agent. Examine the code changes or files provided and identify bugs, style issues, performance concerns, and correctness problems. Be specific — cite line numbers and explain why each issue matters.",
-			tools: ["read", "bash"],
+			description: "Applies review rubrics and reports evidence-backed findings",
+			systemPrompt:
+				"You are a senior code reviewer. Review actual changed behavior as merge-ready code, not just whether it matches the intended plan. Prefer reviewing the real diff, changed files, and affected tests over summaries. If plan.md, progress.md, specs, design notes, or other review artifacts exist and are relevant, read them early and use them as context, not as the source of truth. Apply any injected review-* rubric skills explicitly; if none are injected, default to a correctness-focused review. Report only concrete, evidence-backed findings, explain why each issue matters, and distinguish clearly between blocker, medium-risk, and advisory findings. Bash is for read-only inspection only: git diff, git log, git show, and similar non-mutating commands.",
+			tools: ["read", "grep", "find", "ls", "bash"],
+			skills: ["review-correctness"],
+			defaultReads: ["plan.md", "progress.md"],
 		},
 	},
 	{

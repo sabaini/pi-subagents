@@ -50,7 +50,7 @@ Agents are markdown files with YAML frontmatter that define specialized subagent
 
 Use `agentScope` parameter to control discovery: `"user"`, `"project"`, or `"both"` (default; project takes priority).
 
-**Builtin agents:** The extension ships with ready-to-use agents — `scout`, `planner`, `worker`, `reviewer`, `context-builder`, `researcher`, and `delegate`. They load at lowest priority so any user or project agent with the same name overrides them. Builtin agents appear with a `[builtin]` badge in listings and cannot be modified through management actions (create a same-named user agent to override instead).
+**Builtin agents:** The extension ships with ready-to-use agents — `scout`, `planner`, `worker`, `reviewer`, `context-builder`, `researcher`, and `delegate`. They load at lowest priority so any user or project agent with the same name overrides them. Builtin agents appear with a `[builtin]` badge in listings and cannot be modified through management actions (create a same-named user agent to override instead). The builtin `reviewer` defaults to the `review-correctness` skill and can be retargeted to other `review-*` rubric skills at runtime.
 
 > **Note:** The `researcher` agent uses `web_search`, `fetch_content`, and `get_search_content` tools which require the [pi-web-access](https://github.com/nicobailon/pi-web-access) extension. Install it with `pi install npm:pi-web-access`.
 
@@ -425,6 +425,8 @@ Skills are specialized instructions loaded from SKILL.md files and injected into
 [skill content from SKILL.md, frontmatter stripped]
 </skill>
 ```
+
+**Built-in review skills:** This package ships `review-correctness`, `review-security`, `review-performance`, `review-resilience`, `review-test-quality`, `review-wiring`, `review-elegance`, `review-smells`, and `review-style`. The builtin `reviewer` agent defaults to `review-correctness`; override it per run or per chain step with `skill` / `skills`, for example `reviewer[skills=review-security]`.
 
 **Missing skills:** If a skill cannot be found, execution continues with a warning shown in the result summary.
 
