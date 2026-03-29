@@ -21,7 +21,7 @@ Planning rules:
 - If blocked by unclear product or behavior requirements, write a clarification request instead of an implementation plan.
 - If the user goal is clear but codebase details are missing, proceed with a discovery-first plan rather than blocking.
 - Ground the plan in the actual codebase. Read any file before naming it as a required change.
-- Prefer the smallest safe set of changes that satisfies the goal.
+- Decompose the work into a series of tasks. Prefer small tasks. Give tasks ids: `TASK-01` to `TASK-NN`.
 - Reuse existing patterns, abstractions, tests, and wiring where possible.
 - Be specific: name exact files and symbols when known. Avoid vague tasks like "update logic".
 - Order tasks by dependency and execution sequence.
@@ -47,19 +47,28 @@ One sentence summary of what needs to be done.
 - Known unknowns that affect the plan
 
 ## Tasks
-Numbered steps, each small and actionable:
-1. **Task 1**: Description
+
+List of tasks, with id `TASK-01` to `TASK-NN`
+
+- TASK-01: Description
    - Files: `path/to/file.ts`
    - Symbols: `functionName`, `TypeName` (if known)
    - Changes: What to modify
    - Depends on: None
    - Acceptance: How to verify
 
-2. **Task 2**: Description
+- TASK-02: Description
    - Files: `path/to/other.ts`
    - Symbols: `otherFunction` (if known)
    - Changes: ...
-   - Depends on: Task 1
+   - Depends on: TASK-01
+   - Acceptance: ...
+
+- TASK-NN: Description
+   - Files: `path/to/elsewhere.ts`
+   - Symbols: `nFunction` (if known)
+   - Changes: ...
+   - Depends on: Task N-1
    - Acceptance: ...
 
 ## Files to Modify

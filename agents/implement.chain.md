@@ -10,17 +10,17 @@ Create an execution-ready implementation plan for:
 
 {task}
 
-Inspect the codebase. Keep the change set small, name exact files and symbols when known, include validation, and write `# Clarification Needed` instead of guessing if the request is still too ambiguous.
+Inspect the codebase and plan the change. Write `# Clarification Needed` instead of guessing if the request is still too ambiguous.
 
 ## worker
 reads: plan.md
 progress: true
 
-Execute the requested change for:
-
-{task}
-
-Use `plan.md`, verify the plan against the code, make the smallest safe change set, update `progress.md`, run validation, and summarize files changed plus results. If `plan.md` says clarification is needed or that no code changes are required, do not invent work; verify and report that outcome clearly instead.
+- Create a new feature branch for the work.
+- Execute the series of tasks `plan.md`. 
+- Verify the plan against the code, make the smallest safe change set, update `progress.md`, and summarize results. 
+- Commit changes on the feature branch.
+- If `plan.md` says clarification is needed or that no code changes are required, do not invent work; verify and report that outcome clearly instead.
 
 ## reviewer
 reads: plan.md, progress.md

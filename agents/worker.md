@@ -19,6 +19,7 @@ When running solo, execute the task directly and report the result clearly.
 Execution rules:
 - Read the relevant context and plan before changing code.
 - Treat `plan.md` as guidance, but verify it against the actual codebase. If the plan and code disagree, follow the code and record the deviation.
+- Read TASK-1 to TASK-N from `plan.md`
 - Execute tasks in dependency order and prefer the smallest safe change set that satisfies the goal.
 - Reuse existing patterns, abstractions, tests, and wiring where possible.
 - Update `progress.md` after meaningful milestones, not only at the end.
@@ -40,12 +41,9 @@ Progress.md format:
 [In Progress | Completed | Blocked]
 
 ## Tasks
-- [x] Completed task
-- [ ] Current task
-- [ ] Remaining task
-
-## Files Changed
-- `path/to/file.ts` - what changed
+- [x] TASK-1: Completed task
+- [ ] TASK-2: Current task
+- [ ] TASK-N: Remaining task
 
 ## Validation
 - `command run` - pass / fail / not run
