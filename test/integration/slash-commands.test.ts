@@ -93,18 +93,70 @@ function createState(cwd: string) {
 	};
 }
 
-function createCommandContext(overrides: Partial<{ hasUI: boolean; custom: (...args: unknown[]) => Promise<unknown> }> = {}) {
+function createCommandContext(
+	arg: Partial<{ hasUI: boolean; custom: (...args: unknown[]) => Promise<unknown> }> | Array<{ message: string; level?: string }> = {},
+) {
+	const overrides: Partial<{ hasUI: boolean; custom: (...args: unknown[]) => Promise<unknown> }> =
+		Array.isArray(arg) ? {} : arg;
+	const notifications = Array.isArray(arg) ? arg : undefined;
 	return {
 		cwd: process.cwd(),
 		hasUI: overrides.hasUI ?? false,
 		ui: {
-			notify: (_message: string) => {},
+			notify: (message: string, level?: string) => {
+				notifications?.push({ message, level });
+			},
 			setStatus: (_key: string, _text: string | undefined) => {},
 			onTerminalInput: () => () => {},
 			custom: overrides.custom ?? (async () => undefined),
 		},
 		modelRegistry: { getAvailable: () => [] },
 	};
+}
+
+function assertImplementChainRequest(
+	requestedParams: unknown,
+	expectedTask: string,
+	overrides?: { async?: boolean; context?: string },
+): void {
+	assert.equal(typeof requestedParams, "object");
+	assert.ok(requestedParams);
+	const params = requestedParams as {
+		chain: Array<Record<string, unknown>>;
+		task: string;
+		clarify: boolean;
+		agentScope: string;
+		async?: boolean;
+		context?: string;
+	};
+
+	assert.equal(params.task, expectedTask);
+	assert.equal(params.clarify, false);
+	assert.equal(params.agentScope, "both");
+	assert.equal(params.async, overrides?.async);
+	assert.equal(params.context, overrides?.context);
+	assert.equal(params.chain.length, 4);
+
+	assert.equal(params.chain[0]?.agent, "scout");
+	assert.equal(params.chain[0]?.output, "context.md");
+	assert.equal(params.chain[0]?.progress, false);
+	assert.match(String(params.chain[0]?.task ?? ""), /Investigate the request/);
+	assert.match(String(params.chain[0]?.task ?? ""), /\{task\}/);
+
+	assert.equal(params.chain[1]?.agent, "planner");
+	assert.deepEqual(params.chain[1]?.reads, ["context.md"]);
+	assert.equal(params.chain[1]?.output, "plan.md");
+	assert.match(String(params.chain[1]?.task ?? ""), /Create an execution-ready implementation plan/);
+
+	assert.equal(params.chain[2]?.agent, "worker");
+	assert.deepEqual(params.chain[2]?.reads, ["context.md", "plan.md"]);
+	assert.equal(params.chain[2]?.progress, true);
+	assert.match(String(params.chain[2]?.task ?? ""), /Execute the requested change/);
+
+	assert.equal(params.chain[3]?.agent, "reviewer");
+	assert.deepEqual(params.chain[3]?.reads, ["plan.md", "progress.md"]);
+	assert.equal(params.chain[3]?.output, "review.md");
+	assert.match(String(params.chain[3]?.task ?? ""), /Review the resulting working tree/);
 }
 
 describe("slash command custom message delivery", { skip: !available ? "slash-commands.ts not importable" : undefined }, () => {
@@ -234,5 +286,98 @@ describe("subagents-status slash command", { skip: !available ? "slash-commands.
 		}));
 
 		assert.equal(customCalls, 1);
+	});
+
+	it("/run-chain resolves a saved chain by name and delegates inline chain steps", async () => {
+		const commands = new Map<string, { handler(args: string, ctx: unknown): Promise<void> }>();
+		const events = createEventBus();
+		let requestedParams: unknown;
+		events.on(SLASH_SUBAGENT_REQUEST_EVENT, (data) => {
+			const requestId = (data as { requestId: string }).requestId;
+			requestedParams = (data as { params: unknown }).params;
+			events.emit(SLASH_SUBAGENT_STARTED_EVENT, { requestId });
+			events.emit(SLASH_SUBAGENT_RESPONSE_EVENT, {
+				requestId,
+				result: {
+					content: [{ type: "text", text: "Implement finished" }],
+					details: { mode: "chain", results: [] },
+				},
+				isError: false,
+			});
+		});
+
+		const pi = {
+			events,
+			registerCommand(name: string, spec: { handler(args: string, ctx: unknown): Promise<void> }) {
+				commands.set(name, spec);
+			},
+			registerShortcut() {},
+			sendMessage(_message: unknown) {},
+		};
+
+		registerSlashCommands!(pi, createState(process.cwd()));
+		await commands.get("run-chain")!.handler("implement fix the login flow", createCommandContext());
+
+		assertImplementChainRequest(requestedParams, "fix the login flow");
+	});
+
+	it("/run-chain resolves @path refs and forwards --bg/--fork", async () => {
+		const commands = new Map<string, { handler(args: string, ctx: unknown): Promise<void> }>();
+		const events = createEventBus();
+		let requestedParams: unknown;
+		events.on(SLASH_SUBAGENT_REQUEST_EVENT, (data) => {
+			const requestId = (data as { requestId: string }).requestId;
+			requestedParams = (data as { params: unknown }).params;
+			events.emit(SLASH_SUBAGENT_STARTED_EVENT, { requestId });
+			events.emit(SLASH_SUBAGENT_RESPONSE_EVENT, {
+				requestId,
+				result: {
+					content: [{ type: "text", text: "Implement queued" }],
+					details: { mode: "chain", results: [] },
+				},
+				isError: false,
+			});
+		});
+
+		const pi = {
+			events,
+			registerCommand(name: string, spec: { handler(args: string, ctx: unknown): Promise<void> }) {
+				commands.set(name, spec);
+			},
+			registerShortcut() {},
+			sendMessage(_message: unknown) {},
+		};
+
+		registerSlashCommands!(pi, createState(process.cwd()));
+		await commands.get("run-chain")!.handler("@agents/implement.chain.md fix retries --bg --fork", createCommandContext());
+
+		assertImplementChainRequest(requestedParams, "fix retries", { async: true, context: "fork" });
+	});
+
+	it("/run-chain reports unknown chains without dispatching a run", async () => {
+		const commands = new Map<string, { handler(args: string, ctx: unknown): Promise<void> }>();
+		const events = createEventBus();
+		let dispatched = false;
+		events.on(SLASH_SUBAGENT_REQUEST_EVENT, () => {
+			dispatched = true;
+		});
+		const notifications: Array<{ message: string; level?: string }> = [];
+
+		const pi = {
+			events,
+			registerCommand(name: string, spec: { handler(args: string, ctx: unknown): Promise<void> }) {
+				commands.set(name, spec);
+			},
+			registerShortcut() {},
+			sendMessage(_message: unknown) {},
+		};
+
+		registerSlashCommands!(pi, createState(process.cwd()));
+		await commands.get("run-chain")!.handler("missing-chain do something", createCommandContext(notifications));
+
+		assert.equal(dispatched, false);
+		assert.deepEqual(notifications, [
+			{ message: "Unknown chain: missing-chain. Available: implement.", level: "error" },
+		]);
 	});
 });

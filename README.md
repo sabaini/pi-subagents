@@ -130,12 +130,34 @@ Subagents only get direct MCP tools when `mcp:` items are explicitly listed. Eve
 | Command | Description |
 |---------|-------------|
 | `/run <agent> <task>` | Run a single agent with a task |
+| `/run-chain <chain> <task>` | Run a saved `.chain.md` pipeline by name or `@path` |
 | `/chain agent1 "task1" -> agent2 "task2"` | Run agents in sequence with per-step tasks |
 | `/parallel agent1 "task1" -> agent2 "task2"` | Run agents in parallel with per-step tasks |
 | `/subagents-status` | Open the async status overlay for active and recent runs |
 | `/agents` | Open the Agents Manager overlay |
 
-All commands validate agent names locally and tab-complete them, then route through the tool framework for full live progress rendering. Results are sent to the conversation for the LLM to discuss.
+All commands validate agent or chain names locally and tab-complete them when applicable, then route through the tool framework for full live progress rendering. Results are sent to the conversation for the LLM to discuss.
+
+### Saved Chain Launches
+
+Run a reusable saved chain directly by name:
+
+```
+/run-chain implement fix the login flow
+```
+
+You can also reference a chain file path, including `@...` refs:
+
+```
+/run-chain @.pi/agents/review-pipeline.chain.md review the auth changes
+/run-chain @agents/implement.chain.md add retry handling
+```
+
+Like the other slash commands, `--bg` and `--fork` are supported:
+
+```
+/run-chain implement refactor the auth flow --bg --fork
+```
 
 ### Per-Step Tasks
 
@@ -188,6 +210,7 @@ Add `--bg` at the end of any slash command to run in the background:
 
 ```
 /run scout "full security audit of the codebase" --bg
+/run-chain implement add audit logging --bg
 /chain scout "analyze auth system" -> planner "design refactor plan" -> worker --bg
 /parallel scout "scan frontend" -> scout "scan backend" -> scout "scan infra" --bg
 ```
@@ -200,6 +223,7 @@ Add `--fork` at the end of `/run`, `/chain`, or `/parallel` to run with `context
 
 ```
 /run reviewer "review this diff" --fork
+/run-chain implement tighten auth validation --fork
 /chain scout "analyze this branch" -> planner "plan next steps" --fork
 /parallel scout "audit frontend" -> reviewer "audit backend" --fork
 ```

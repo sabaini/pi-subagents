@@ -1,7 +1,8 @@
+import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Key, matchesKey } from "@mariozechner/pi-tui";
-import { discoverAgents, discoverAgentsAll } from "./agents.js";
+import { discoverAgents, discoverAgentsAll, type ChainConfig } from "./agents.js";
 import { AgentManagerComponent, type ManagerResult } from "./agent-manager.js";
 import { SubagentsStatusComponent } from "./subagents-status.js";
 import { discoverAvailableSkills } from "./skills.js";
@@ -104,6 +105,77 @@ const makeAgentCompletions = (state: SubagentState, multiAgent: boolean) => (pre
 
 	return agents.filter((a) => a.name.startsWith(lastWord)).map((a) => ({ value: `${beforeLastWord}${a.name}`, label: a.name }));
 };
+
+const chainSourcePriority = (chain: Pick<ChainConfig, "source">): number => {
+	switch (chain.source) {
+		case "project": return 0;
+		case "user": return 1;
+		default: return 2;
+	}
+};
+
+const compareChainsByPriority = (a: ChainConfig, b: ChainConfig): number => {
+	const priority = chainSourcePriority(a) - chainSourcePriority(b);
+	if (priority !== 0) return priority;
+	return a.name.localeCompare(b.name);
+};
+
+const preferredChains = (cwd: string): ChainConfig[] => {
+	const preferred = new Map<string, ChainConfig>();
+	const chains = [...discoverAgentsAll(cwd).chains].sort(compareChainsByPriority);
+	for (const chain of chains) {
+		if (!preferred.has(chain.name)) preferred.set(chain.name, chain);
+	}
+	return [...preferred.values()];
+};
+
+const makeChainCompletions = (state: SubagentState) => (prefix: string) => {
+	if (prefix.includes(" ") || prefix.startsWith("@")) return null;
+	return preferredChains(state.baseCwd)
+		.filter((chain) => chain.name.startsWith(prefix))
+		.map((chain) => ({ value: chain.name, label: `${chain.name} [${chain.source}]` }));
+};
+
+const normalizeChainName = (name: string): string => name.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+const normalizeSlashes = (p: string): string => p.replace(/\\/g, "/");
+
+const resolveSavedChain = (cwd: string, ref: string): ChainConfig | undefined => {
+	const chains = [...discoverAgentsAll(cwd).chains].sort(compareChainsByPriority);
+	const trimmed = ref.trim();
+	const cleanRef = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
+	if (!cleanRef) return undefined;
+
+	if (cleanRef.includes("/") || cleanRef.includes("\\") || cleanRef.endsWith(".chain.md")) {
+		const resolvedRef = normalizeSlashes(path.resolve(cwd, cleanRef));
+		const normalizedRef = normalizeSlashes(cleanRef);
+		const pathMatch = chains.find((chain) => normalizeSlashes(path.resolve(chain.filePath)) === resolvedRef);
+		if (pathMatch) return pathMatch;
+
+		const suffixMatches = chains.filter((chain) => {
+			const chainPath = normalizeSlashes(path.resolve(chain.filePath));
+			return chainPath.endsWith(`/${normalizedRef}`) || chainPath === normalizedRef;
+		});
+		if (suffixMatches.length > 0) return suffixMatches[0];
+
+		const basenameMatches = chains.filter((chain) => path.basename(chain.filePath) === path.basename(cleanRef));
+		if (basenameMatches.length > 0) return basenameMatches[0];
+	}
+
+	const normalizedName = normalizeChainName(cleanRef);
+	return chains.find((chain) => chain.name === cleanRef || chain.name === normalizedName);
+};
+
+const savedChainToExecutionSteps = (chain: ChainConfig) => chain.steps.map((step) => ({
+	agent: step.agent,
+	task: step.task || undefined,
+	output: step.output,
+	reads: step.reads,
+	progress: step.progress,
+	skill: step.skills,
+	model: step.model,
+}));
+
+const availableChainNames = (cwd: string): string => preferredChains(cwd).map((chain) => chain.name).join(", ") || "none";
 
 async function requestSlashRun(
 	pi: ExtensionAPI,
@@ -281,17 +353,8 @@ async function openAgentManager(
 			agentScope: "both",
 		});
 	} else if (result.action === "launch-chain") {
-		const chainParam = result.chain.steps.map((step) => ({
-			agent: step.agent,
-			task: step.task || undefined,
-			output: step.output,
-			reads: step.reads,
-			progress: step.progress,
-			skill: step.skills,
-			model: step.model,
-		}));
 		await runSlashSubagent(pi, ctx, {
-			chain: chainParam,
+			chain: savedChainToExecutionSteps(result.chain),
 			task: result.task,
 			clarify: !result.skipClarify,
 			agentScope: "both",
@@ -439,6 +502,46 @@ export function registerSlashCommands(
 				...(config.progress !== undefined ? { progress: config.progress } : {}),
 			}));
 			const params: SubagentParamsLike = { chain, task: parsed.task, clarify: false, agentScope: "both" };
+			if (bg) params.async = true;
+			if (fork) params.context = "fork";
+			await runSlashSubagent(pi, ctx, params);
+		},
+	});
+
+	pi.registerCommand("run-chain", {
+		description: "Run a saved chain: /run-chain implement <task> [--bg] [--fork]",
+		getArgumentCompletions: makeChainCompletions(state),
+		handler: async (args, ctx) => {
+			const { args: cleanedArgs, bg, fork } = extractExecutionFlags(args);
+			const input = cleanedArgs.trim();
+			const firstSpace = input.indexOf(" ");
+			if (firstSpace === -1) {
+				ctx.ui.notify("Usage: /run-chain <chain-name|@path/to.chain.md> <task> [--bg] [--fork]", "error");
+				return;
+			}
+			const chainRef = input.slice(0, firstSpace).trim();
+			const task = input.slice(firstSpace + 1).trim();
+			if (!chainRef || !task) {
+				ctx.ui.notify("Usage: /run-chain <chain-name|@path/to.chain.md> <task> [--bg] [--fork]", "error");
+				return;
+			}
+
+			const chain = resolveSavedChain(ctx.cwd, chainRef);
+			if (!chain) {
+				ctx.ui.notify(`Unknown chain: ${chainRef}. Available: ${availableChainNames(ctx.cwd)}.`, "error");
+				return;
+			}
+			if (chain.steps.length === 0) {
+				ctx.ui.notify(`Chain '${chain.name}' has no steps.`, "error");
+				return;
+			}
+
+			const params: SubagentParamsLike = {
+				chain: savedChainToExecutionSteps(chain),
+				task,
+				clarify: false,
+				agentScope: "both",
+			};
 			if (bg) params.async = true;
 			if (fork) params.context = "fork";
 			await runSlashSubagent(pi, ctx, params);
