@@ -98,7 +98,7 @@ export function renderChainDetail(
 	theme: Theme,
 ): string[] {
 	const lines: string[] = [];
-	const scopeBadge = chain.source === "user" ? "[user]" : "[proj]";
+	const scopeBadge = chain.source === "builtin" ? "[builtin]" : chain.source === "user" ? "[user]" : "[proj]";
 	lines.push(renderHeader(` ${chain.name} [chain] ${scopeBadge} `, width, theme));
 	lines.push(row("", width, theme));
 

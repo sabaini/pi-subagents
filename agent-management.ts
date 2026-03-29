@@ -326,7 +326,7 @@ export function handleList(params: ManagementParams, ctx: ManagementContext): Ag
 	const scope = normalizeListScope(params.agentScope) ?? "both";
 	const d = discoverAgentsAll(ctx.cwd);
 	const agents = allAgents(d).filter((a) => scope === "both" || a.source === "builtin" || a.source === scope).sort((a, b) => a.name.localeCompare(b.name));
-	const chains = d.chains.filter((c) => scope === "both" || c.source === scope).sort((a, b) => a.name.localeCompare(b.name));
+	const chains = d.chains.filter((c) => scope === "both" || c.source === "builtin" || c.source === scope).sort((a, b) => a.name.localeCompare(b.name));
 	const lines = ["Agents:", ...(agents.length ? agents.map((a) => `- ${a.name} (${a.source}): ${a.description}`) : ["- (none)"]), "", "Chains:", ...(chains.length ? chains.map((c) => `- ${c.name} (${c.source}): ${c.description}`) : ["- (none)"])];
 	return result(lines.join("\n"));
 }

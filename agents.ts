@@ -262,6 +262,7 @@ export function discoverAgentsAll(cwd: string): {
 	];
 	const project = projectDir ? loadAgentsFromDir(projectDir, "project") : [];
 	const chains = [
+		...loadChainsFromDir(BUILTIN_AGENTS_DIR, "builtin"),
 		...loadChainsFromDir(userDirOld, "user"),
 		...loadChainsFromDir(userDirNew, "user"),
 		...(projectDir ? loadChainsFromDir(projectDir, "project") : []),

@@ -81,7 +81,8 @@ export class AgentManagerComponent implements Component {
 	private loadEntries(): void {
 		const overridden = new Set([...this.agentData.user, ...this.agentData.project].map((c) => c.name));
 		const agents: AgentEntry[] = []; for (const config of this.agentData.builtin) { if (!overridden.has(config.name)) agents.push({ id: `a${this.nextId++}`, kind: "agent", config: cloneConfig(config), isNew: false }); } for (const config of this.agentData.user) agents.push({ id: `a${this.nextId++}`, kind: "agent", config: cloneConfig(config), isNew: false }); for (const config of this.agentData.project) agents.push({ id: `a${this.nextId++}`, kind: "agent", config: cloneConfig(config), isNew: false }); this.agents = agents;
-		const chains: ChainEntry[] = []; for (const config of this.agentData.chains) chains.push({ id: `c${this.nextId++}`, kind: "chain", config: cloneChainConfig(config) }); this.chains = chains;
+		const overriddenChains = new Set(this.agentData.chains.filter((config) => config.source !== "builtin").map((config) => config.name));
+		const chains: ChainEntry[] = []; for (const config of this.agentData.chains) { if (config.source === "builtin" && overriddenChains.has(config.name)) continue; chains.push({ id: `c${this.nextId++}`, kind: "chain", config: cloneChainConfig(config) }); } this.chains = chains;
 	}
 
 	private getAgentEntry(id: string | null): AgentEntry | undefined { if (!id) return undefined; return this.agents.find((entry) => entry.id === id); }
@@ -349,14 +350,26 @@ export class AgentManagerComponent implements Component {
 		this.editState = null; this.enterDetail(entry); this.tui.requestRender();
 	}
 
-	private isBuiltin(id: string): boolean { const a = this.getAgentEntry(id); return a?.config.source === "builtin"; }
+	private isBuiltin(id: string): boolean {
+		const agent = this.getAgentEntry(id);
+		if (agent) return agent.config.source === "builtin";
+		const chain = this.getChainEntry(id);
+		return chain?.config.source === "builtin";
+	}
 
 	private handleListAction(action: ListAction): void {
 		switch (action.type) {
 			case "open-detail": { const agent = this.getAgentEntry(action.id); if (agent) { this.enterDetail(agent); return; } const chain = this.getChainEntry(action.id); if (chain) this.enterChainDetail(chain); return; }
 			case "clone": if (this.getAgentEntry(action.id)) this.enterNameInput("clone-agent", action.id); else if (this.getChainEntry(action.id)) this.enterNameInput("clone-chain", action.id); return;
 			case "new": this.enterTemplateSelect(); return;
-			case "delete": { if (this.isBuiltin(action.id)) { this.statusMessage = { text: "Builtin agents cannot be deleted. Clone to user scope to override.", type: "error" }; return; } this.confirmDeleteId = action.id; this.screen = "confirm-delete"; return; }
+			case "delete": {
+				if (this.isBuiltin(action.id)) {
+					const kind = this.getChainEntry(action.id) ? "chains" : "agents";
+					this.statusMessage = { text: `Builtin ${kind} cannot be deleted. Clone to user scope to override.`, type: "error" };
+					return;
+				}
+				this.confirmDeleteId = action.id; this.screen = "confirm-delete"; return;
+			}
 			case "run-chain": this.enterTaskInput(action.ids); return;
 			case "run-parallel": this.enterParallelBuilder(action.ids); return;
 			case "close": this.done(undefined); return;
@@ -372,7 +385,14 @@ export class AgentManagerComponent implements Component {
 	private handleChainDetailAction(action: ChainDetailAction, entry: ChainEntry): void {
 		if (action.type === "back") { this.screen = "list"; return; }
 		if (action.type === "launch") { this.enterSavedChainLaunch(entry); return; }
-		if (action.type === "edit") this.enterChainEdit(entry);
+		if (action.type === "edit") {
+			if (entry.config.source === "builtin") {
+				this.statusMessage = { text: "Builtin chains cannot be edited. Clone to user scope to override.", type: "error" };
+				this.screen = "list";
+				return;
+			}
+			this.enterChainEdit(entry);
+		}
 	}
 
 	render(width: number): string[] {
