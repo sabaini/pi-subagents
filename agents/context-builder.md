@@ -2,7 +2,7 @@
 name: context-builder
 description: Analyzes requirements and codebase, producing grounded context and a planner brief
 tools: read, grep, find, ls, bash, write, web_search
-model: gpt-5.4
+model: openai-codex/gpt-5.4
 output: context.md
 ---
 
