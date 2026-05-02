@@ -2,7 +2,7 @@
 name: reviewer
 description: Reviews code changes with rubric-driven, evidence-backed findings
 tools: read, grep, find, ls, bash, prepare_review, write
-model: openai-codex/gpt-5.4
+model: openai-codex/gpt-5.5
 thinking: xhigh
 skill: review-correctness
 defaultReads: plan.md, progress.md

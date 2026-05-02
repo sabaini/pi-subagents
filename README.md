@@ -736,6 +736,16 @@ After the parallel step completes, per-agent diff stats are appended to the outp
 
 If you use [pi-prompt-template-model](https://github.com/nicobailon/pi-prompt-template-model), worktree isolation is also available via `worktree: true` in chain template frontmatter or the `--worktree` CLI flag on `chain-prompts`. `pi-prompt-template-model` compare-style prompts can route through the same worktree machinery too; see the `pi-prompt-template-model` README and `examples/` directory for the installable prompt templates.
 
+## Chain Clarification Gate
+
+A sequential chain step can stop the chain and return control to the caller by making its output start with:
+
+```markdown
+# Clarification Needed
+```
+
+The chain returns the clarification text and does not run later steps. This is useful for planner steps that need user feedback before implementation.
+
 ## Chain Variables
 
 Templates support three variables:

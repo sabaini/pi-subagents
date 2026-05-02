@@ -2,7 +2,7 @@
 name: researcher
 description: Conducts grounded web research and produces an evidence-backed brief
 tools: read, write, web_search, fetch_content, get_search_content
-model: openai-codex/gpt-5.4
+model: openai-codex/gpt-5.5
 output: research.md
 defaultProgress: true
 ---

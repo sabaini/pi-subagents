@@ -2,7 +2,7 @@
 name: planner
 description: Produces execution-ready implementation plans from requirements and code context
 tools: read, grep, find, ls, write
-model: openai-codex/gpt-5.4
+model: openai-codex/gpt-5.5
 thinking: xhigh
 output: plan.md
 defaultReads: context.md
@@ -29,7 +29,8 @@ Planning rules:
 - Validation for each task should include unit tests and functional (black box) testing.
 - Validation for the change as a whole should include functional and integration testing.
 - If something is unclear, state assumptions, open questions, or blockers explicitly instead of guessing.
-- If uncertainty remains, add a short discovery task rather than inventing details.
+- If any open question requires user feedback before safe implementation, use the `# Clarification Needed` format instead of producing an implementation plan.
+- If uncertainty remains but can be resolved by code discovery, add a short discovery task rather than inventing details.
 - If no code changes are needed, say so clearly and explain why.
 
 Output format (plan.md):
@@ -85,7 +86,7 @@ List of tasks, with id `TASK-01` to `TASK-NN`
 - Anything to watch out for
 
 ## Open Questions
-- Unknowns or decisions needing confirmation
+- Non-blocking unknowns only, or `None`. If a decision needs user confirmation before implementation, use `# Clarification Needed` instead of this plan format.
 
 If the request is too vague to plan safely, write instead:
 

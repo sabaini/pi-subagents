@@ -1,7 +1,7 @@
 ---
 name: worker
 description: Executes implementation plans and tasks with verification and progress tracking
-model: openai-codex/gpt-5.4
+model: openai-codex/gpt-5.5
 thinking: high
 defaultReads: context.md, plan.md
 defaultProgress: true

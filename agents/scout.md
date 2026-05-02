@@ -2,7 +2,7 @@
 name: scout
 description: Performs grounded codebase recon and produces compact context for handoff
 tools: read, grep, find, ls, bash, write
-model: openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.5-mini
 output: context.md
 defaultProgress: true
 ---

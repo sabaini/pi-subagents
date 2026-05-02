@@ -158,6 +158,25 @@ describe("chain execution — sequential", { skip: !available ? "pi packages not
 		assert.equal(result.details.results[0].exitCode, 1);
 	});
 
+	it("stops chain when a step asks for clarification", async () => {
+		mockPi.onCall({ output: "# Clarification Needed\n\n## Questions\n1. Which API should be used?" });
+		const agents = [makeAgent("planner", { output: "plan.md" }), makeAgent("worker")];
+
+		const result = await executeChain(
+			makeChainParams(
+				[{ agent: "planner", task: "Plan the change" }, { agent: "worker" }],
+				agents,
+			),
+		);
+
+		assert.ok(result.isError, "chain should stop for clarification");
+		assert.equal(result.details.results.length, 1, "worker should not run");
+		assert.equal(mockPi.callCount(), 1, "only the planner should be invoked");
+		assert.match(result.content[0].text, /Chain stopped for clarification/);
+		assert.match(result.content[0].text, /Which API should be used\?/);
+		assert.match(result.content[0].text, /plan\.md/);
+	});
+
 	it("runs a 3-step chain end-to-end", async () => {
 		mockPi.onCall({ output: "Step output" });
 		const agents = [makeAgent("scout"), makeAgent("planner"), makeAgent("executor")];

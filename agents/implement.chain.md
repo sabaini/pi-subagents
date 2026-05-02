@@ -12,6 +12,8 @@ Create an execution-ready implementation plan for:
 
 Inspect the codebase and plan the change. Write `# Clarification Needed` instead of guessing if the request is still too ambiguous.
 
+Only write `# Implementation Plan` when the plan is safe to execute without additional user feedback. If there are any user-facing open questions, decisions, or success criteria that must be answered before implementation, write `# Clarification Needed` with the questions instead of putting them under `## Open Questions`.
+
 ## worker
 reads: plan.md
 progress: true

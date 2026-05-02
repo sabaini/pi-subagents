@@ -207,6 +207,15 @@ function createShareLink(htmlPath: string): { shareUrl: string; gistUrl: string 
 	}
 }
 
+function startsWithClarificationNeeded(output: string | undefined): boolean {
+	const firstNonEmptyLine = output
+		?.replace(/^\uFEFF/, "")
+		.split(/\r?\n/)
+		.find((line) => line.trim().length > 0)
+		?.trim();
+	return /^#\s+Clarification Needed\s*$/i.test(firstNonEmptyLine ?? "");
+}
+
 function writeJson(filePath: string, payload: object): void {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
 	const tempPath = path.join(
@@ -764,10 +773,11 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 			}
 
 			previousOutput = singleResult.output;
+			const clarificationNeeded = singleResult.exitCode === 0 && startsWithClarificationNeeded(singleResult.output);
 			results.push({
 				agent: singleResult.agent,
 				output: singleResult.output,
-				success: singleResult.exitCode === 0,
+				success: singleResult.exitCode === 0 && !clarificationNeeded,
 				artifactPaths: singleResult.artifactPaths,
 			});
 
@@ -784,10 +794,10 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 			}
 
 			const stepEndTime = Date.now();
-			statusPayload.steps[flatIndex].status = singleResult.exitCode === 0 ? "complete" : "failed";
+			statusPayload.steps[flatIndex].status = singleResult.exitCode === 0 && !clarificationNeeded ? "complete" : "failed";
 			statusPayload.steps[flatIndex].endedAt = stepEndTime;
 			statusPayload.steps[flatIndex].durationMs = stepEndTime - stepStartTime;
-			statusPayload.steps[flatIndex].exitCode = singleResult.exitCode;
+			statusPayload.steps[flatIndex].exitCode = clarificationNeeded ? 1 : singleResult.exitCode;
 			if (stepTokens) {
 				statusPayload.steps[flatIndex].tokens = stepTokens;
 				statusPayload.totalTokens = { ...previousCumulativeTokens };
@@ -796,18 +806,20 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 			writeJson(statusPath, statusPayload);
 
 			appendJsonl(eventsPath, JSON.stringify({
-				type: singleResult.exitCode === 0 ? "subagent.step.completed" : "subagent.step.failed",
+				type: singleResult.exitCode === 0 && !clarificationNeeded ? "subagent.step.completed" : "subagent.step.failed",
 				ts: stepEndTime,
 				runId: id,
 				stepIndex: flatIndex,
 				agent: seqStep.agent,
-				exitCode: singleResult.exitCode,
+				exitCode: clarificationNeeded ? 1 : singleResult.exitCode,
 				durationMs: stepEndTime - stepStartTime,
 				tokens: stepTokens,
+				error: clarificationNeeded ? "Clarification needed" : undefined,
 			}));
 
 			flatIndex++;
-			if (singleResult.exitCode !== 0) {
+			if (singleResult.exitCode !== 0 || clarificationNeeded) {
+				if (clarificationNeeded) statusPayload.error = `Clarification needed: ${seqStep.agent}`;
 				break;
 			}
 		}
@@ -868,7 +880,7 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 	statusPayload.shareUrl = shareUrl;
 	statusPayload.gistUrl = gistUrl;
 	statusPayload.shareError = shareError;
-	if (statusPayload.state === "failed") {
+	if (statusPayload.state === "failed" && !statusPayload.error) {
 		const failedStep = statusPayload.steps.find((s) => s.status === "failed");
 		if (failedStep?.agent) {
 			statusPayload.error = `Step failed: ${failedStep.agent}`;

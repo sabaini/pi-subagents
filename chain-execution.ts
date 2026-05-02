@@ -126,6 +126,33 @@ function buildChainExecutionErrorResult(message: string, input: ChainExecutionDe
 	};
 }
 
+function startsWithClarificationNeeded(output: string | undefined): boolean {
+	const firstNonEmptyLine = output
+		?.replace(/^\uFEFF/, "")
+		.split(/\r?\n/)
+		.find((line) => line.trim().length > 0)
+		?.trim();
+	return /^#\s+Clarification Needed\s*$/i.test(firstNonEmptyLine ?? "");
+}
+
+function buildClarificationNeededResult(input: ChainExecutionDetailsInput & {
+	stepIndex: number;
+	agent: string;
+	chainDir: string;
+	clarification: string;
+	clarificationPath?: string;
+}): ChainExecutionResult {
+	const pathLine = input.clarificationPath ? `\n📄 Clarification artifact: ${input.clarificationPath}` : "";
+	return {
+		content: [{
+			type: "text",
+			text: `⏸️ Chain stopped for clarification at step ${input.stepIndex + 1} (${input.agent}).\n\n${input.clarification.trim()}${pathLine}\n📁 Chain artifacts: ${input.chainDir}`,
+		}],
+		isError: true,
+		details: buildChainExecutionDetails(input),
+	};
+}
+
 function ensureParallelProgressFile(
 	chainDir: string,
 	progressCreated: boolean,
@@ -734,7 +761,26 @@ export async function executeChain(params: ChainExecutionParams): Promise<ChainE
 				};
 			}
 
-			prev = getSingleResultOutput(r);
+			const stepOutput = getSingleResultOutput(r);
+			if (startsWithClarificationNeeded(stepOutput)) {
+				return buildClarificationNeededResult({
+					results,
+					includeProgress,
+					allProgress,
+					allArtifactPaths,
+					artifactsDir,
+					chainAgents,
+					totalSteps,
+					currentStepIndex: stepIndex,
+					stepIndex,
+					agent: seqStep.agent,
+					chainDir,
+					clarification: stepOutput,
+					clarificationPath: r.savedOutputPath ?? outputPath,
+				});
+			}
+
+			prev = stepOutput;
 		}
 	}
 
